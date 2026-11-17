@@ -1,20 +1,13 @@
 import 'dart:convert';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'models.dart';
+import 'screens.dart';
 
 void main() {
   runApp(const TodaysWordApp());
-}
-
-class AppConfig {
-  static const String appName = '오늘의 영단어';
-  static const String dataUrl =
-      'https://raw.githubusercontent.com/hyuckiii-real/todays-x-data/main/data/daily_words.json';
-  static const String cacheKey = 'cached_words_json_v1';
-  static const String bookmarkKey = 'bookmarked_word_ids_v1';
 }
 
 class TodaysWordApp extends StatelessWidget {
@@ -33,68 +26,6 @@ class TodaysWordApp extends StatelessWidget {
         useMaterial3: true,
       ),
       home: const MainScaffold(),
-    );
-  }
-}
-
-class ExampleSentence {
-  final String en;
-  final String ko;
-
-  ExampleSentence({required this.en, required this.ko});
-
-  factory ExampleSentence.fromJson(Map<String, dynamic> json) {
-    return ExampleSentence(
-      en: (json['en'] ?? '').toString(),
-      ko: (json['ko'] ?? '').toString(),
-    );
-  }
-}
-
-class WordItem {
-  final int id;
-  final String date;
-  final String category;
-  final String title;
-  final String subtitle;
-  final String summary;
-  final String partOfSpeech;
-  final List<ExampleSentence> examples;
-  final List<String> synonyms;
-  final List<String> quizDistractors;
-
-  WordItem({
-    required this.id,
-    required this.date,
-    required this.category,
-    required this.title,
-    required this.subtitle,
-    required this.summary,
-    required this.partOfSpeech,
-    required this.examples,
-    required this.synonyms,
-    required this.quizDistractors,
-  });
-
-  factory WordItem.fromJson(Map<String, dynamic> json) {
-    final payload = json['payload'] as Map<String, dynamic>? ?? {};
-    final rawExamples = payload['examples'] as List<dynamic>? ?? [];
-    final rawSynonyms = payload['synonyms'] as List<dynamic>? ?? [];
-    final rawDistractors = payload['quiz_distractors'] as List<dynamic>? ?? [];
-
-    return WordItem(
-      id: json['id'] ?? 0,
-      date: json['date'] ?? '',
-      category: json['category'] ?? '일반',
-      title: json['title'] ?? '',
-      subtitle: json['subtitle'] ?? '',
-      summary: json['summary'] ?? '',
-      partOfSpeech: payload['part_of_speech'] ?? '',
-      examples: rawExamples
-          .map((e) => ExampleSentence.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      synonyms: rawSynonyms.map((e) => e.toString()).toList(),
-      quizDistractors: rawDistractors.map((e) => e.toString()).toList(),
     );
   }
 }
@@ -131,3 +62,139 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   Future<void> _speak(String text) async {
     await _tts.stop();
+    await _tts.setSpeechRate(_isSlowSpeech ? 0.32 : 0.5);
+    await _tts.speak(text);
+  }
+
+  Future<void> _loadBookmarksAndSyncData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final prefs = await SharedPreferences.getInstance();
+    final savedBookmarks = prefs.getStringList(AppConfig.bookmarkKey) ?? [];
+    _bookmarkedIds = savedBookmarks.map(int.parse).toSet();
+
+    final cachedJson = prefs.getString(AppConfig.cacheKey);
+    if (cachedJson != null) {
+      _parseAndSetWords(cachedJson);
+    }
+
+    try {
+      final response = await http
+          .get(Uri.parse(AppConfig.dataUrl))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final decodedBody = utf8.decode(response.bodyBytes);
+        await prefs.setString(AppConfig.cacheKey, decodedBody);
+        _parseAndSetWords(decodedBody);
+      } else if (_words.isEmpty) {
+        _errorMessage = '데이터를 불러오지 못했습니다. (HTTP ${response.statusCode})';
+      }
+    } catch (e) {
+      if (_words.isEmpty) {
+        _errorMessage = '네트워크 연결을 확인해 주세요.';
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  void _parseAndSetWords(String rawJson) {
+    final Map<String, dynamic> data = json.decode(rawJson);
+    final List<dynamic> items = data['items'] ?? [];
+    if (mounted) {
+      setState(() {
+        _words = items.map((e) => WordItem.fromJson(e)).toList();
+      });
+    }
+  }
+
+  Future<void> _toggleBookmark(int id) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      if (_bookmarkedIds.contains(id)) {
+        _bookmarkedIds.remove(id);
+      } else {
+        _bookmarkedIds.add(id);
+      }
+    });
+    await prefs.setStringList(
+      AppConfig.bookmarkKey,
+      _bookmarkedIds.map((e) => e.toString()).toList(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _tts.stop();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screens = [
+      TodayWordScreen(
+        words: _words,
+        bookmarkedIds: _bookmarkedIds,
+        isLoading: _isLoading,
+        errorMessage: _errorMessage,
+        isSlowSpeech: _isSlowSpeech,
+        onToggleSlow: () => setState(() => _isSlowSpeech = !_isSlowSpeech),
+        onSpeak: _speak,
+        onToggleBookmark: _toggleBookmark,
+        onRefresh: _loadBookmarksAndSyncData,
+      ),
+      QuizScreen(words: _words),
+      ArchiveScreen(
+        words: _words,
+        bookmarkedIds: _bookmarkedIds,
+        onSpeak: _speak,
+        onToggleBookmark: _toggleBookmark,
+      ),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          AppConfig.appName,
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: '최신 단어 동기화',
+            onPressed: _loadBookmarksAndSyncData,
+          ),
+        ],
+      ),
+      body: screens[_currentIndex],
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentIndex,
+        onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.auto_stories_outlined),
+            selectedIcon: Icon(Icons.auto_stories),
+            label: '오늘의 단어',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.quiz_outlined),
+            selectedIcon: Icon(Icons.quiz),
+            label: '미니 퀴즈',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bookmarks_outlined),
+            selectedIcon: Icon(Icons.bookmarks),
+            label: '단어장',
+          ),
+        ],
+      ),
+    );
+  }
+}
