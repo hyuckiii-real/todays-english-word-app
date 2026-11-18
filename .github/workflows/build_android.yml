@@ -29,7 +29,8 @@ jobs:
           flutter create . --org com.todaysx --project-name todays_english_word
 
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
-          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:tools="http://schemas.android.com/tools">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
@@ -72,11 +73,11 @@ jobs:
           </manifest>
           EOF
 
-          # minSdk 23 강제 지정 및 Lint 크래시 방지
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/g' android/app/build.gradle.kts
+          # build.gradle.kts의 minSdk를 23으로 확실히 변경 및 Lint 비활성화
+          sed -i 's/minSdk = .*/minSdk = 23/g' android/app/build.gradle.kts
           echo -e "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}" >> android/app/build.gradle.kts
 
-          cat android/app/src/main/AndroidManifest.xml
+          cat android/app/build.gradle.kts
 
       - name: Install dependencies
         run: flutter pub get
