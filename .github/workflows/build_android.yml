@@ -28,26 +28,55 @@ jobs:
           rm -rf android
           flutter create . --org com.todaysx --project-name todays_english_word
 
-          python3 -c '
-          path = "android/app/src/main/AndroidManifest.xml"
-          with open(path, "r", encoding="utf-8") as f:
-              xml = f.read()
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
-          perm = "    <uses-permission android:name=\"android.permission.INTERNET\" />\n"
-          if "android.permission.INTERNET" not in xml:
-              xml = xml.replace("<application", perm + "    <application", 1)
+              <application
+                  android:label="오늘의 영단어"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:taskAffinity=""
+                      android:theme="@style/LaunchTheme"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <meta-data
+                          android:name="io.flutter.embedding.android.NormalTheme"
+                          android:resource="@style/NormalTheme" />
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
 
-          meta = "        <meta-data\n            android:name=\"com.google.android.gms.ads.APPLICATION_ID\"\n            android:value=\"ca-app-pub-3940256099942544~3347511713\"/>\n    </application>"
-          xml = xml.replace("</application>", meta, 1)
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+                  <meta-data
+                      android:name="com.google.android.gms.ads.APPLICATION_ID"
+                      android:value="ca-app-pub-3940256099942544~3347511713" />
+              </application>
 
-          with open(path, "w", encoding="utf-8") as f:
-              f.write(xml)
-          '
+              <queries>
+                  <intent>
+                      <action android:name="android.intent.action.PROCESS_TEXT"/>
+                      <data android:mimeType="text/plain"/>
+                  </intent>
+              </queries>
+          </manifest>
+          EOF
+
+          # minSdk 23 강제 지정 및 Lint 크래시 방지
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 23/g' android/app/build.gradle.kts
+          echo -e "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}" >> android/app/build.gradle.kts
 
           cat android/app/src/main/AndroidManifest.xml
-
-          # Android Lint 내부 크래시 방지 설정 추가
-          echo -e "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}" >> android/app/build.gradle.kts
 
       - name: Install dependencies
         run: flutter pub get
