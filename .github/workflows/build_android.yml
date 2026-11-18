@@ -23,20 +23,18 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Initialize Flutter project structure with Internet permission
+      - name: Initialize Flutter project structure with Internet & AdMob
         run: |
-          # 1. android 폴더가 혹시 불완전하게 있으면 싹 지우고 깨끗하게 재생성
           rm -rf android
           flutter create . --org com.todaysx --project-name todays_english_word
           
-          # 2. 자동 생성된 AndroidManifest.xml에 인터넷 권한(<uses-permission>) 코드 자동 삽입
           MANIFEST_PATH="android/app/src/main/AndroidManifest.xml"
           PERMISSION_LINE='    <uses-permission android:name="android.permission.INTERNET" />'
+          ADMOB_META='        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>'
           
-          # <manifest 바로 아래에 인터넷 권한 한 줄을 삽입합니다.
           sed -i "/<manifest/a $PERMISSION_LINE" "$MANIFEST_PATH"
+          sed -i "/<\/application>/i $ADMOB_META" "$MANIFEST_PATH"
           
-          # 3. 확인을 위해 수정된 매니페스트 출력
           cat "$MANIFEST_PATH"
 
       - name: Install dependencies
