@@ -256,4 +256,5 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   Widget build(BuildContext context) {
     if (widget.words.isEmpty) {
-      return const Center(child: Text('퀴즈를 출제할 단어 데이터가
+      return const Center(child: Text('퀴즈를 출제할 단어 데이터가 없습니다.'));
+    }
