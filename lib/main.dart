@@ -7,9 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
 import 'screens.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await MobileAds.instance.initialize();
   runApp(const TodaysWordApp());
 }
 
@@ -50,36 +49,41 @@ class _MainScaffoldState extends State<MainScaffold> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isSlowSpeech = false;
 
-  // 애드몹 배너 광고 관련 상태
   BannerAd? _bannerAd;
   bool _isBannerLoaded = false;
 
-  // 구글 공식 안드로이드 테스트 배너 광고 단위 ID (출시 전 본인 실제 광고 ID로 교체)
+  // 구글 공식 안드로이드 테스트 배너 광고 단위 ID
   static const String _adUnitId = 'ca-app-pub-3940256099942544/6300978111';
 
   @override
   void initState() {
     super.initState();
-    _loadBannerAd();
+    _initAdsAndLoadBanner();
     _loadBookmarksAndSyncData();
   }
 
-  void _loadBannerAd() {
-    _bannerAd = BannerAd(
-      adUnitId: _adUnitId,
-      request: const AdRequest(),
-      size: AdSize.banner,
-      listener: BannerAdListener(
-        onAdLoaded: (_) {
-          if (mounted) {
-            setState(() => _isBannerLoaded = true);
-          }
-        },
-        onAdFailedToLoad: (ad, err) {
-          ad.dispose();
-        },
-      ),
-    )..load();
+  Future<void> _initAdsAndLoadBanner() async {
+    try {
+      await MobileAds.instance.initialize();
+      if (!mounted) return;
+      _bannerAd = BannerAd(
+        adUnitId: _adUnitId,
+        request: const AdRequest(),
+        size: AdSize.banner,
+        listener: BannerAdListener(
+          onAdLoaded: (_) {
+            if (mounted) {
+              setState(() => _isBannerLoaded = true);
+            }
+          },
+          onAdFailedToLoad: (ad, err) {
+            ad.dispose();
+          },
+        ),
+      )..load();
+    } catch (_) {
+      // 광고 초기화 실패 시에도 앱 본 기능은 정상 동작
+    }
   }
 
   Future<void> _playAudio(String url) async {
