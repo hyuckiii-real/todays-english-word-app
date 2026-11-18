@@ -58,14 +58,13 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   void initState() {
     super.initState();
-    _initAdsAndLoadBanner();
     _loadBookmarksAndSyncData();
+    Future.delayed(const Duration(milliseconds: 1500), _loadBannerSafe);
   }
 
-  Future<void> _initAdsAndLoadBanner() async {
+  void _loadBannerSafe() {
+    if (!mounted) return;
     try {
-      await MobileAds.instance.initialize();
-      if (!mounted) return;
       _bannerAd = BannerAd(
         adUnitId: _adUnitId,
         request: const AdRequest(),
@@ -81,9 +80,7 @@ class _MainScaffoldState extends State<MainScaffold> {
           },
         ),
       )..load();
-    } catch (_) {
-      // 광고 초기화 실패 시에도 앱 본 기능은 정상 동작
-    }
+    } catch (_) {}
   }
 
   Future<void> _playAudio(String url) async {
