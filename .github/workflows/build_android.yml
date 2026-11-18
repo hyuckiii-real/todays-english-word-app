@@ -21,6 +21,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.27.4'
           channel: 'stable'
 
       - name: Initialize Flutter project structure with Internet & AdMob
@@ -75,16 +76,11 @@ jobs:
               f.write(manifest)
           EOF
 
-          sed -i 's/minSdk = .*/minSdk = 23/g' android/app/build.gradle.kts
-          echo -e "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}" >> android/app/build.gradle.kts
-
-          cat android/app/src/main/AndroidManifest.xml
-
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release --no-shrink
+        run: flutter build apk --release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
