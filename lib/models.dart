@@ -2,20 +2,26 @@ class AppConfig {
   static const String appName = '오늘의 영단어';
   static const String dataUrl =
       'https://raw.githubusercontent.com/hyuckiii-real/todays-x-data/main/data/daily_words.json';
-  static const String cacheKey = 'cached_words_json_v1';
+  static const String cacheKey = 'cached_words_json_v2';
   static const String bookmarkKey = 'bookmarked_word_ids_v1';
 }
 
 class ExampleSentence {
   final String en;
   final String ko;
+  final String audioUrl;
 
-  ExampleSentence({required this.en, required this.ko});
+  ExampleSentence({
+    required this.en,
+    required this.ko,
+    required this.audioUrl,
+  });
 
   factory ExampleSentence.fromJson(Map<String, dynamic> json) {
     return ExampleSentence(
       en: (json['en'] ?? '').toString(),
       ko: (json['ko'] ?? '').toString(),
+      audioUrl: (json['audio_url'] ?? '').toString(),
     );
   }
 }
@@ -28,6 +34,7 @@ class WordItem {
   final String subtitle;
   final String summary;
   final String partOfSpeech;
+  final String wordAudioUrl;
   final List<ExampleSentence> examples;
   final List<String> synonyms;
   final List<String> quizDistractors;
@@ -40,6 +47,7 @@ class WordItem {
     required this.subtitle,
     required this.summary,
     required this.partOfSpeech,
+    required this.wordAudioUrl,
     required this.examples,
     required this.synonyms,
     required this.quizDistractors,
@@ -59,6 +67,7 @@ class WordItem {
       subtitle: json['subtitle'] ?? '',
       summary: json['summary'] ?? '',
       partOfSpeech: payload['part_of_speech'] ?? '',
+      wordAudioUrl: (payload['word_audio_url'] ?? '').toString(),
       examples: rawExamples
           .map((e) => ExampleSentence.fromJson(e as Map<String, dynamic>))
           .toList(),
