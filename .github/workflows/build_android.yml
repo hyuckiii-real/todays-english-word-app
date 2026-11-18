@@ -27,18 +27,27 @@ jobs:
         run: |
           rm -rf android
           flutter create . --org com.todaysx --project-name todays_english_word
-          
-          MANIFEST_PATH="android/app/src/main/AndroidManifest.xml"
-          PERMISSION_LINE='    <uses-permission android:name="android.permission.INTERNET" />'
-          ADMOB_META='        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"/>'
-          
-          sed -i "/<manifest/a $PERMISSION_LINE" "$MANIFEST_PATH"
-          sed -i "/<\/application>/i $ADMOB_META" "$MANIFEST_PATH"
+
+          python3 -c '
+          path = "android/app/src/main/AndroidManifest.xml"
+          with open(path, "r", encoding="utf-8") as f:
+              xml = f.read()
+
+          perm = "    <uses-permission android:name=\"android.permission.INTERNET\" />\n"
+          if "android.permission.INTERNET" not in xml:
+              xml = xml.replace("<application", perm + "    <application", 1)
+
+          meta = "        <meta-data\n            android:name=\"com.google.android.gms.ads.APPLICATION_ID\"\n            android:value=\"ca-app-pub-3940256099942544~3347511713\"/>\n    </application>"
+          xml = xml.replace("</application>", meta, 1)
+
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(xml)
+          '
+
+          cat android/app/src/main/AndroidManifest.xml
 
           # Android Lint 내부 크래시 방지 설정 추가
           echo -e "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}" >> android/app/build.gradle.kts
-          
-          cat "$MANIFEST_PATH"
 
       - name: Install dependencies
         run: flutter pub get
