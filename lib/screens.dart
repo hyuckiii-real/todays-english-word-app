@@ -9,7 +9,7 @@ class TodayWordScreen extends StatefulWidget {
   final String? errorMessage;
   final bool isSlowSpeech;
   final VoidCallback onToggleSlow;
-  final Future<void> Function(String) onSpeak;
+  final Future<void> Function(String) onPlayAudio;
   final Future<void> Function(int) onToggleBookmark;
   final Future<void> Function() onRefresh;
 
@@ -21,7 +21,7 @@ class TodayWordScreen extends StatefulWidget {
     required this.errorMessage,
     required this.isSlowSpeech,
     required this.onToggleSlow,
-    required this.onSpeak,
+    required this.onPlayAudio,
     required this.onToggleBookmark,
     required this.onRefresh,
   });
@@ -71,7 +71,7 @@ class _TodayWordScreenState extends State<TodayWordScreen> {
                 backgroundColor: Theme.of(context).colorScheme.primaryContainer,
               ),
               FilterChip(
-                label: Text(widget.isSlowSpeech ? '0.6x 느리게' : '1.0x 보통 속도'),
+                label: Text(widget.isSlowSpeech ? '0.75x 느리게' : '1.0x 보통 속도'),
                 selected: widget.isSlowSpeech,
                 onSelected: (_) => widget.onToggleSlow(),
               ),
@@ -118,9 +118,9 @@ class _TodayWordScreenState extends State<TodayWordScreen> {
                       ),
                       const SizedBox(width: 8),
                       FilledButton.tonalIcon(
-                        onPressed: () => widget.onSpeak(todayWord.title),
+                        onPressed: () => widget.onPlayAudio(todayWord.wordAudioUrl),
                         icon: const Icon(Icons.volume_up, size: 20),
-                        label: const Text('발음 듣기'),
+                        label: const Text('원어민 발음'),
                       ),
                     ],
                   ),
@@ -179,7 +179,7 @@ class _TodayWordScreenState extends State<TodayWordScreen> {
                 ),
                 trailing: IconButton(
                   icon: const Icon(Icons.volume_up_outlined),
-                  onPressed: () => widget.onSpeak(ex.en),
+                  onPressed: () => widget.onPlayAudio(ex.audioUrl),
                 ),
               ),
             ),
@@ -312,14 +312,14 @@ class _QuizScreenState extends State<QuizScreen> {
 class ArchiveScreen extends StatefulWidget {
   final List<WordItem> words;
   final Set<int> bookmarkedIds;
-  final Future<void> Function(String) onSpeak;
+  final Future<void> Function(String) onPlayAudio;
   final Future<void> Function(int) onToggleBookmark;
 
   const ArchiveScreen({
     super.key,
     required this.words,
     required this.bookmarkedIds,
-    required this.onSpeak,
+    required this.onPlayAudio,
     required this.onToggleBookmark,
   });
 
@@ -374,7 +374,7 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.volume_up_outlined),
-                            onPressed: () => widget.onSpeak(word.title),
+                            onPressed: () => widget.onPlayAudio(word.wordAudioUrl),
                           ),
                           IconButton(
                             icon: Icon(
