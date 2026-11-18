@@ -1,6 +1,6 @@
 import 'dart:convert';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
@@ -44,26 +44,35 @@ class _MainScaffoldState extends State<MainScaffold> {
   bool _isLoading = true;
   String? _errorMessage;
 
-  final FlutterTts _tts = FlutterTts();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isSlowSpeech = false;
 
   @override
   void initState() {
     super.initState();
-    _initTts();
     _loadBookmarksAndSyncData();
   }
 
-  Future<void> _initTts() async {
-    await _tts.setLanguage('en-US');
-    await _tts.setPitch(1.0);
-    await _tts.setSpeechRate(0.5);
-  }
-
-  Future<void> _speak(String text) async {
-    await _tts.stop();
-    await _tts.setSpeechRate(_isSlowSpeech ? 0.32 : 0.5);
-    await _tts.speak(text);
+  Future<void> _playAudio(String url) async {
+    if (url.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('오디오 파일이 아직 준비되지 않았습니다.')),
+        );
+      }
+      return;
+    }
+    try {
+      await _audioPlayer.stop();
+      await _audioPlayer.setPlaybackRate(_isSlowSpeech ? 0.75 : 1.0);
+      await _audioPlayer.play(UrlSource(url));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('음성 재생에 실패했습니다. 네트워크를 확인해 주세요.')),
+        );
+      }
+    }
   }
 
   Future<void> _loadBookmarksAndSyncData() async {
@@ -131,7 +140,7 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   @override
   void dispose() {
-    _tts.stop();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -145,7 +154,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         errorMessage: _errorMessage,
         isSlowSpeech: _isSlowSpeech,
         onToggleSlow: () => setState(() => _isSlowSpeech = !_isSlowSpeech),
-        onSpeak: _speak,
+        onPlayAudio: _playAudio,
         onToggleBookmark: _toggleBookmark,
         onRefresh: _loadBookmarksAndSyncData,
       ),
@@ -153,7 +162,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       ArchiveScreen(
         words: _words,
         bookmarkedIds: _bookmarkedIds,
-        onSpeak: _speak,
+        onPlayAudio: _playAudio,
         onToggleBookmark: _toggleBookmark,
       ),
     ];
