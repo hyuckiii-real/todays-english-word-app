@@ -34,6 +34,9 @@ jobs:
           
           sed -i "/<manifest/a $PERMISSION_LINE" "$MANIFEST_PATH"
           sed -i "/<\/application>/i $ADMOB_META" "$MANIFEST_PATH"
+
+          # Android Lint 내부 크래시 방지 설정 추가
+          echo -e "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}" >> android/app/build.gradle.kts
           
           cat "$MANIFEST_PATH"
 
