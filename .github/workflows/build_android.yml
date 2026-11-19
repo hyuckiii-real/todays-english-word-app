@@ -29,17 +29,28 @@ jobs:
           rm -rf android
           flutter create . --org com.todaysx --project-name todays_english_word
 
-          # 1. Gradle Wrapper 버전을 8.4로 업그레이드 (Java 17 & AGP 8.2.1 완벽 호환)
-          sed -i 's/gradle-.*-all.zip/gradle-8.4-all.zip/g' android/gradle/wrapper/gradle-wrapper.properties
-
-          # 2. AGP 버전을 8.1.0 -> 8.2.1로 업그레이드
-          for f in android/settings.gradle android/settings.gradle.kts; do
-            if [ -f "$f" ]; then
-              sed -i 's/8\.1\.0/8.2.1/g' "$f"
-            fi
-          done
-
           python3 - << 'EOF'
+          import re, os
+
+          # 1. gradle-wrapper.properties -> Gradle 8.4 고정
+          wrapper_path = "android/gradle/wrapper/gradle-wrapper.properties"
+          with open(wrapper_path, "r", encoding="utf-8") as f:
+              content = f.read()
+          content = re.sub(r"gradle-[0-9.]+-(all|bin)\.zip", "gradle-8.4-all.zip", content)
+          with open(wrapper_path, "w", encoding="utf-8") as f:
+              f.write(content)
+
+          # 2. settings.gradle(.kts) -> AGP 8.2.1 & Kotlin 1.9.22 고정
+          for s_path in ["android/settings.gradle", "android/settings.gradle.kts"]:
+              if os.path.exists(s_path):
+                  with open(s_path, "r", encoding="utf-8") as f:
+                      s_content = f.read()
+                  s_content = re.sub(r'("com\.android\.application"\s+version\s+")[^"]+(")', r'\g<1>8.2.1\g<2>', s_content)
+                  s_content = re.sub(r'("org\.jetbrains\.kotlin\.android"\s+version\s+")[^"]+(")', r'\g<1>1.9.22\g<2>', s_content)
+                  with open(s_path, "w", encoding="utf-8") as f:
+                      f.write(s_content)
+
+          # 3. AndroidManifest.xml 덮어쓰기 (인터넷 + AdMob 테스트 앱 ID)
           manifest = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
