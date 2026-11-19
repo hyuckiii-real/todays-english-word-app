@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'models.dart';
@@ -49,39 +48,10 @@ class _MainScaffoldState extends State<MainScaffold> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isSlowSpeech = false;
 
-  BannerAd? _bannerAd;
-  bool _isBannerLoaded = false;
-
-  // 구글 공식 안드로이드 테스트 배너 광고 단위 ID
-  static const String _adUnitId = 'ca-app-pub-3940256099942544/6300978111';
-
   @override
   void initState() {
     super.initState();
     _loadBookmarksAndSyncData();
-    _initAdsAndLoadBanner();
-  }
-
-  Future<void> _initAdsAndLoadBanner() async {
-    try {
-      await MobileAds.instance.initialize();
-      if (!mounted) return;
-      _bannerAd = BannerAd(
-        adUnitId: _adUnitId,
-        request: const AdRequest(),
-        size: AdSize.banner,
-        listener: BannerAdListener(
-          onAdLoaded: (_) {
-            if (mounted) {
-              setState(() => _isBannerLoaded = true);
-            }
-          },
-          onAdFailedToLoad: (ad, err) {
-            ad.dispose();
-          },
-        ),
-      )..load();
-    } catch (_) {}
   }
 
   Future<void> _playAudio(String url) async {
@@ -172,7 +142,6 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   void dispose() {
     _audioPlayer.dispose();
-    _bannerAd?.dispose();
     super.dispose();
   }
 
@@ -214,20 +183,7 @@ class _MainScaffoldState extends State<MainScaffold> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(child: screens[_currentIndex]),
-          if (_isBannerLoaded && _bannerAd != null)
-            SafeArea(
-              top: false,
-              child: SizedBox(
-                width: _bannerAd!.size.width.toDouble(),
-                height: _bannerAd!.size.height.toDouble(),
-                child: AdWidget(ad: _bannerAd!),
-              ),
-            ),
-        ],
-      ),
+      body: screens[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
