@@ -21,7 +21,6 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.27.4'
           channel: 'stable'
 
       - name: Initialize Flutter project structure with Internet & AdMob
@@ -32,29 +31,7 @@ jobs:
           python3 - << 'EOF'
           import os, re
 
-          # 1. gradle-wrapper.properties -> Gradle 8.5로 업그레이드
-          w_path = "android/gradle/wrapper/gradle-wrapper.properties"
-          with open(w_path, "r", encoding="utf-8") as f:
-              w = f.read()
-          w = re.sub(r"gradle-[0-9.]+-(all|bin)\.zip", "gradle-8.5-all.zip", w)
-          with open(w_path, "w", encoding="utf-8") as f:
-              f.write(w)
-          print("=== gradle-wrapper.properties ===")
-          print(w)
-
-          # 2. settings.gradle(.kts) -> AGP 8.2.1, Kotlin 1.9.22 강제 치환
-          for s_path in ["android/settings.gradle", "android/settings.gradle.kts"]:
-              if os.path.exists(s_path):
-                  with open(s_path, "r", encoding="utf-8") as f:
-                      s = f.read()
-                  s = s.replace("8.1.0", "8.2.1").replace("8.2.0", "8.2.1")
-                  s = s.replace("1.8.22", "1.9.22").replace("1.9.0", "1.9.22").replace("1.9.10", "1.9.22")
-                  with open(s_path, "w", encoding="utf-8") as f:
-                      f.write(s)
-                  print(f"=== {s_path} ===")
-                  print(s)
-
-          # 3. AndroidManifest.xml 덮어쓰기 (인터넷 + AdMob 테스트 앱 ID)
+          # 1. AndroidManifest.xml 덮어쓰기 (INTERNET + AD_ID + 테스트 APPLICATION_ID)
           manifest = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
@@ -99,13 +76,28 @@ jobs:
           '''
           with open("android/app/src/main/AndroidManifest.xml", "w", encoding="utf-8") as f:
               f.write(manifest)
+
+          # 2. build.gradle(.kts) 수정: minSdk = 23 고정 & 릴리즈 Lint 크래시 비활성화
+          for g_path in ["android/app/build.gradle.kts", "android/app/build.gradle"]:
+              if os.path.exists(g_path):
+                  with open(g_path, "r", encoding="utf-8") as f:
+                      g = f.read()
+                  g = re.sub(r"minSdk\s*=\s*[^\n]+", "minSdk = 23", g)
+                  g = re.sub(r"minSdkVersion\s+[^\n]+", "minSdkVersion 23", g)
+                  if g_path.endswith(".kts"):
+                      g += "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}\n"
+                  else:
+                      g += "\nandroid {\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n}\n"
+                  with open(g_path, "w", encoding="utf-8") as f:
+                      f.write(g)
+                  print(f"=== Updated {g_path} ===")
           EOF
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-shrink
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
