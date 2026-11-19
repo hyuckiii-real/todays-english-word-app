@@ -59,12 +59,13 @@ class _MainScaffoldState extends State<MainScaffold> {
   void initState() {
     super.initState();
     _loadBookmarksAndSyncData();
-    Future.delayed(const Duration(milliseconds: 1500), _loadBannerSafe);
+    _initAdsAndLoadBanner();
   }
 
-  void _loadBannerSafe() {
-    if (!mounted) return;
+  Future<void> _initAdsAndLoadBanner() async {
     try {
+      await MobileAds.instance.initialize();
+      if (!mounted) return;
       _bannerAd = BannerAd(
         adUnitId: _adUnitId,
         request: const AdRequest(),
