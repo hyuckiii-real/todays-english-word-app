@@ -29,11 +29,10 @@ jobs:
           flutter create . --org com.todaysx --project-name todays_english_word
 
           python3 - << 'EOF'
-          import os, re
+          import os, re, glob
 
-          # 1. AndroidManifest.xml 덮어쓰기 (AD_SERVICES_CONFIG 충돌 차단 포함)
-          manifest = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools">
+          # 1. AndroidManifest.xml 덮어쓰기 (INTERNET + AD_ID + 테스트 APPLICATION_ID)
+          manifest = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
@@ -65,9 +64,6 @@ jobs:
                   <meta-data
                       android:name="com.google.android.gms.ads.APPLICATION_ID"
                       android:value="ca-app-pub-3940256099942544~3347511713" />
-                  <property
-                      android:name="android.adservices.AD_SERVICES_CONFIG"
-                      tools:node="remove" />
               </application>
 
               <queries>
@@ -94,6 +90,37 @@ jobs:
                       g += "\nandroid {\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n}\n"
                   with open(g_path, "w", encoding="utf-8") as f:
                       f.write(g)
+
+          # 3. MainActivity.kt에 크래시 캐치 & 클립보드 복사/화면 출력 안전장치 추가
+          kt_files = glob.glob("android/app/src/main/kotlin/**/MainActivity.kt", recursive=True)
+          for kt in kt_files:
+              with open(kt, "r", encoding="utf-8") as f:
+                  src = f.read()
+              pkg_line = src.splitlines()[0]
+              new_kt = f"""{pkg_line}
+
+          import android.app.AlertDialog
+          import android.os.Bundle
+          import android.os.Looper
+          import io.flutter.embedding.android.FlutterActivity
+
+          class MainActivity: FlutterActivity() {{
+              override fun onCreate(savedInstanceState: Bundle?) {{
+                  val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+                  Thread.setDefaultUncaughtExceptionHandler {{ thread, throwable ->
+                      val msg = android.util.Log.getStackTraceString(throwable)
+                      try {{
+                          val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                          clipboard.setPrimaryClip(android.content.ClipData.newPlainText("crash", msg))
+                      }} catch (_: Exception) {{}}
+                      defaultHandler?.uncaughtException(thread, throwable)
+                  }}
+                  super.onCreate(savedInstanceState)
+              }}
+          }}
+          """
+              with open(kt, "w", encoding="utf-8") as f:
+                  f.write(new_kt)
           EOF
 
       - name: Install dependencies
