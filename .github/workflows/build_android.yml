@@ -23,113 +23,23 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Initialize Flutter project structure with Internet & AdMob
+      - name: Initialize Flutter project structure with Internet permission
         run: |
           rm -rf android
           flutter create . --org com.todaysx --project-name todays_english_word
 
-          python3 - << 'EOF'
-          import os, re, glob
+          MANIFEST_PATH="android/app/src/main/AndroidManifest.xml"
+          PERMISSION_LINE='    <uses-permission android:name="android.permission.INTERNET" />'
+          sed -i "/<manifest/a $PERMISSION_LINE" "$MANIFEST_PATH"
+          sed -i 's/android:label="todays_english_word"/android:label="오늘의 영단어"/g' "$MANIFEST_PATH"
 
-          # 1. AndroidManifest.xml 덮어쓰기 (INTERNET + AD_ID + 테스트 APPLICATION_ID + AD_SERVICES_CONFIG 충돌 차단)
-          manifest = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-              xmlns:tools="http://schemas.android.com/tools">
-              <uses-permission android:name="android.permission.INTERNET" />
-              <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
-
-              <application
-                  android:label="오늘의 영단어"
-                  android:name="${applicationName}"
-                  android:icon="@mipmap/ic_launcher">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:launchMode="singleTop"
-                      android:taskAffinity=""
-                      android:theme="@style/LaunchTheme"
-                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|screenLayout|density|uiMode"
-                      android:hardwareAccelerated="true"
-                      android:windowSoftInputMode="adjustResize">
-                      <meta-data
-                          android:name="io.flutter.embedding.android.NormalTheme"
-                          android:resource="@style/NormalTheme" />
-                      <intent-filter>
-                          <action android:name="android.intent.action.MAIN"/>
-                          <category android:name="android.intent.category.LAUNCHER"/>
-                      </intent-filter>
-                  </activity>
-
-                  <meta-data
-                      android:name="flutterEmbedding"
-                      android:value="2" />
-                  <meta-data
-                      android:name="com.google.android.gms.ads.APPLICATION_ID"
-                      android:value="ca-app-pub-3940256099942544~3347511713" />
-                  <property
-                      android:name="android.adservices.AD_SERVICES_CONFIG"
-                      tools:node="remove" />
-              </application>
-
-              <queries>
-                  <intent>
-                      <action android:name="android.intent.action.PROCESS_TEXT"/>
-                      <data android:mimeType="text/plain"/>
-                  </intent>
-              </queries>
-          </manifest>
-          '''
-          with open("android/app/src/main/AndroidManifest.xml", "w", encoding="utf-8") as f:
-              f.write(manifest)
-
-          # 2. build.gradle(.kts) 수정: minSdk 23, multiDexEnabled, Lint 비활성화
-          for g_path in ["android/app/build.gradle.kts", "android/app/build.gradle"]:
-              if os.path.exists(g_path):
-                  with open(g_path, "r", encoding="utf-8") as f:
-                      g = f.read()
-                  g = re.sub(r"minSdk\s*=\s*[^\n]+", "minSdk = 23\n        multiDexEnabled = true", g)
-                  g = re.sub(r"minSdkVersion\s+[^\n]+", "minSdkVersion 23\n        multiDexEnabled true", g)
-                  if g_path.endswith(".kts"):
-                      g += "\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}\n"
-                  else:
-                      g += "\nandroid {\n    lintOptions {\n        checkReleaseBuilds false\n        abortOnError false\n    }\n}\n"
-                  with open(g_path, "w", encoding="utf-8") as f:
-                      f.write(g)
-
-          # 3. MainActivity.kt 크래시 로그 클립보드 자동 복사 안전장치
-          kt_files = glob.glob("android/app/src/main/kotlin/**/MainActivity.kt", recursive=True)
-          for kt in kt_files:
-              with open(kt, "r", encoding="utf-8") as f:
-                  src = f.read()
-              pkg_line = src.splitlines()[0]
-              new_kt = f"""{pkg_line}
-
-          import android.os.Bundle
-          import io.flutter.embedding.android.FlutterActivity
-
-          class MainActivity: FlutterActivity() {{
-              override fun onCreate(savedInstanceState: Bundle?) {{
-                  val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
-                  Thread.setDefaultUncaughtExceptionHandler {{ thread, throwable ->
-                      val msg = android.util.Log.getStackTraceString(throwable)
-                      try {{
-                          val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                          clipboard.setPrimaryClip(android.content.ClipData.newPlainText("crash", msg))
-                      }} catch (_: Exception) {{}}
-                      defaultHandler?.uncaughtException(thread, throwable)
-                  }}
-                  super.onCreate(savedInstanceState)
-              }}
-          }}
-          """
-              with open(kt, "w", encoding="utf-8") as f:
-                  f.write(new_kt)
-          EOF
+          cat "$MANIFEST_PATH"
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release --no-shrink
+        run: flutter build apk --release
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
