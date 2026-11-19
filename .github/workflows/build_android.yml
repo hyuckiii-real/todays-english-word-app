@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build Signed AAB & APK
 
 on:
   push:
@@ -23,26 +23,110 @@ jobs:
         with:
           channel: 'stable'
 
-      - name: Initialize Flutter project structure with Internet permission
+      - name: Initialize Flutter project with Icon, Internet & Release Signing
         run: |
           rm -rf android
           flutter create . --org com.todaysx --project-name todays_english_word
 
+          # 1. 인터넷 권한 및 한글 앱 이름 적용
           MANIFEST_PATH="android/app/src/main/AndroidManifest.xml"
           PERMISSION_LINE='    <uses-permission android:name="android.permission.INTERNET" />'
           sed -i "/<manifest/a $PERMISSION_LINE" "$MANIFEST_PATH"
           sed -i 's/android:label="todays_english_word"/android:label="오늘의 영단어"/g' "$MANIFEST_PATH"
 
-          cat "$MANIFEST_PATH"
+          # 2. 앱 아이콘(icon.png) 자동 리사이징 및 적용
+          pip install pillow
+          python3 - << 'EOF'
+          import os
+          from PIL import Image
+
+          if os.path.exists("icon.png"):
+              img = Image.open("icon.png").convert("RGBA")
+              # 스토어 업로드용 512x512 생성
+              img.resize((512, 512), Image.LANCZOS).save("store_icon_512.png")
+              # 안드로이드 해상도별 ic_launcher.png 덮어쓰기
+              sizes = {
+                  "mipmap-mdpi": 48,
+                  "mipmap-hdpi": 72,
+                  "mipmap-xhdpi": 96,
+                  "mipmap-xxhdpi": 144,
+                  "mipmap-xxxhdpi": 192,
+              }
+              for folder, px in sizes.items():
+                  out_dir = f"android/app/src/main/res/{folder}"
+                  os.makedirs(out_dir, exist_ok=True)
+                  img.resize((px, px), Image.LANCZOS).save(f"{out_dir}/ic_launcher.png")
+              print("아이콘 적용 완료!")
+          else:
+              print("경고: icon.png 파일이 없어 기본 아이콘을 사용합니다.")
+          EOF
+
+          # 3. Google Play 업로드용 서명 키(Keystore) 생성
+          keytool -genkey -v \
+            -keystore android/app/upload-keystore.jks \
+            -storetype JKS \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -alias upload \
+            -storepass todaysword2026 \
+            -keypass todaysword2026 \
+            -dname "CN=TodaysWord, OU=Dev, O=TodaysX, L=Seoul, S=Seoul, C=KR"
+
+          cat << 'EOF' > android/key.properties
+          storePassword=todaysword2026
+          keyPassword=todaysword2026
+          keyAlias=upload
+          storeFile=upload-keystore.jks
+          EOF
+
+          # 4. build.gradle.kts에 Release 서명 설정 주입
+          python3 - << 'EOF'
+          with open("android/app/build.gradle.kts", "r", encoding="utf-8") as f:
+              g = f.read()
+
+          signing_block = '''
+          import java.util.Properties
+          import java.io.FileInputStream
+
+          val keystoreProperties = Properties()
+          val keystorePropertiesFile = rootProject.file("key.properties")
+          if (keystorePropertiesFile.exists()) {
+              keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+          }
+          '''
+
+          g = signing_block + "\n" + g
+          g = g.replace(
+              'signingConfig = signingConfigs.getByName("debug")',
+              '''signingConfigs {
+                  create("release") {
+                      keyAlias = keystoreProperties.getProperty("keyAlias")
+                      keyPassword = keystoreProperties.getProperty("keyPassword")
+                      storeFile = file(keystoreProperties.getProperty("storeFile"))
+                      storePassword = keystoreProperties.getProperty("storePassword")
+                  }
+              }
+              signingConfig = signingConfigs.getByName("release")'''
+          )
+          with open("android/app/build.gradle.kts", "w", encoding="utf-8") as f:
+              f.write(g)
+          EOF
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build APK
-        run: flutter build apk --release
+      - name: Build Signed AAB & APK
+        run: |
+          flutter build appbundle --release
+          flutter build apk --release
 
-      - name: Upload APK artifact
+      - name: Upload Release Artifacts (AAB, APK, Keystore, Store Icon)
         uses: actions/upload-artifact@v4
         with:
-          name: todays-english-word-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: todays-english-word-release-bundle
+          path: |
+            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/flutter-apk/app-release.apk
+            android/app/upload-keystore.jks
+            store_icon_512.png
