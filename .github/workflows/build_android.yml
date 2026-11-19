@@ -30,25 +30,29 @@ jobs:
           flutter create . --org com.todaysx --project-name todays_english_word
 
           python3 - << 'EOF'
-          import re, os
+          import os, re
 
-          # 1. gradle-wrapper.properties -> Gradle 8.4 고정
-          wrapper_path = "android/gradle/wrapper/gradle-wrapper.properties"
-          with open(wrapper_path, "r", encoding="utf-8") as f:
-              content = f.read()
-          content = re.sub(r"gradle-[0-9.]+-(all|bin)\.zip", "gradle-8.4-all.zip", content)
-          with open(wrapper_path, "w", encoding="utf-8") as f:
-              f.write(content)
+          # 1. gradle-wrapper.properties -> Gradle 8.5로 업그레이드
+          w_path = "android/gradle/wrapper/gradle-wrapper.properties"
+          with open(w_path, "r", encoding="utf-8") as f:
+              w = f.read()
+          w = re.sub(r"gradle-[0-9.]+-(all|bin)\.zip", "gradle-8.5-all.zip", w)
+          with open(w_path, "w", encoding="utf-8") as f:
+              f.write(w)
+          print("=== gradle-wrapper.properties ===")
+          print(w)
 
-          # 2. settings.gradle(.kts) -> AGP 8.2.1 & Kotlin 1.9.22 고정
+          # 2. settings.gradle(.kts) -> AGP 8.2.1, Kotlin 1.9.22 강제 치환
           for s_path in ["android/settings.gradle", "android/settings.gradle.kts"]:
               if os.path.exists(s_path):
                   with open(s_path, "r", encoding="utf-8") as f:
-                      s_content = f.read()
-                  s_content = re.sub(r'("com\.android\.application"\s+version\s+")[^"]+(")', r'\g<1>8.2.1\g<2>', s_content)
-                  s_content = re.sub(r'("org\.jetbrains\.kotlin\.android"\s+version\s+")[^"]+(")', r'\g<1>1.9.22\g<2>', s_content)
+                      s = f.read()
+                  s = s.replace("8.1.0", "8.2.1").replace("8.2.0", "8.2.1")
+                  s = s.replace("1.8.22", "1.9.22").replace("1.9.0", "1.9.22").replace("1.9.10", "1.9.22")
                   with open(s_path, "w", encoding="utf-8") as f:
-                      f.write(s_content)
+                      f.write(s)
+                  print(f"=== {s_path} ===")
+                  print(s)
 
           # 3. AndroidManifest.xml 덮어쓰기 (인터넷 + AdMob 테스트 앱 ID)
           manifest = '''<manifest xmlns:android="http://schemas.android.com/apk/res/android">
